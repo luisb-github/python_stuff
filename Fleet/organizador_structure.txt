@@ -1,0 +1,9 @@
+shortcuts view:
+	column
+		banner (row)
+			add, settings
+		shortcuts list (list) - guardar shortcuts num array
+			shortcuts (column) - uma class diferente 
+				info_display (row)
+					ID, Title, edit, delete
+				actions (grid view ou responsive row)

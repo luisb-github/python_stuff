@@ -1,4 +1,4 @@
-#! maneira de dar upload de cenas copiadas
+#! maneira de dar upload de cenas copiadas nos browsers (não tem a ver com este projeto)
 import os
 import shutil
 import time
@@ -6,7 +6,7 @@ import flet as ft
 import keyboard
 import win32api
 import win32con
-import win32gui
+import win32gui 
 import win32process
 from ahk import AHK
 from ahk.directives import NoTrayIcon
@@ -46,14 +46,15 @@ def main(page: ft.Page):
     hwnd = win32gui.FindWindow(None, "organizador")
     step = 1
 
-    page.window_left = window_position_x
-    page.window_top = window_position_y
+    # page.window_left = window_position_x
+    # page.window_top = window_position_y
     page.window_width = window_width
     page.window_height = window_height
     page.padding = 20
     page.window_resizable = False
     page.title = "organizador"
     page.window_visible = True
+    page.window_always_on_top = True
 
     win32gui.ShowWindow(hwnd, win32con.SW_SHOWNORMAL)
 
@@ -67,9 +68,10 @@ def main(page: ft.Page):
                                 ft.Text(
                                     f'{index}', style=ft.TextThemeStyle.LABEL_LARGE, color="White",),
                                 ft.Text(f'{content["name"]}',
-                                        style=ft.TextThemeStyle.TITLE_MEDIUM, color="White"),
+                                        style=ft.TextThemeStyle.TITLE_MEDIUM, color="White", expand=True),
                             ],
-                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                            alignment=ft.MainAxisAlignment.START,
+                            spacing=20
                         ),
                         height=80,
                         expand=True,
