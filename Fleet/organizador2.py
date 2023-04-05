@@ -1,13 +1,18 @@
 import flet as ft
 
+get_directory_dialog = ""
+
 
 class ShortcutsView(ft.UserControl):
+
+    stored_shortcuts = []
+
     def build(self):
         self.banner = ft.Row(
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             controls=[
-                ft.IconButton(icon=ft.icons.ADD, icon_color="white",
-                              icon_size=22, tooltip="Add shortcut",),
+                ft.OutlinedButton("Add (a)", icon=ft.icons.ADD,
+                                  on_click=self.add_shortcut),
                 ft.IconButton(icon=ft.icons.SETTINGS, icon_color="white",
                               icon_size=22, tooltip="Settings",)
             ]
@@ -17,6 +22,7 @@ class ShortcutsView(ft.UserControl):
         self.load_shortcuts_to_list()
 
         return ft.Column(
+            spacing=34,
             controls=[
                 self.banner,
                 self.shortcuts_list,
@@ -35,11 +41,24 @@ class ShortcutsView(ft.UserControl):
         # grab list of shortcuts
         stored_shortcuts = self.read_stored_shortcuts()
 
+        # check if there is stored shortcuts
+        if not stored_shortcuts:
+            no_shortctuts_text = ft.Text("No shortcuts created", expand=True,
+                                         text_align=ft.TextAlign.CENTER, style=ft.TextThemeStyle.LABEL_LARGE, )
+            self.shortcuts_list.controls.append(no_shortctuts_text)
+            return
+
         # append shortcuts to list
         for index, content in enumerate(stored_shortcuts, 1):
-            shortcut = Shortcut(index, content["title"], content["path"])
+            title = content.get("title", "no title")
+            path = content.get("path", "no path")
+            shortcut = Shortcut(index, title, path)
             self.shortcuts_list.controls.append(shortcut)
         # add shortcut to array
+
+    def add_shortcut(self, id=0, title="", path=""):
+        print('add')
+        pass
 
 
 class Shortcut(ft.UserControl):
@@ -61,6 +80,20 @@ class Shortcut(ft.UserControl):
                         color="White",),
                 ft.Text(self.title, style=ft.TextThemeStyle.TITLE_MEDIUM,
                         color="White", expand=True),
+            ]
+        )
+
+        self.info_display.visible = False
+
+        self.edit_shortcut_mode = ft.ResponsiveRow(
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            controls=[
+                ft.TextField(label="ID", border="underline", keyboard_type=ft.KeyboardType.NUMBER,
+                             max_length=1, col=3, text_align=ft.TextAlign.CENTER, dense=True),
+                ft.TextField(label="Title", border="underline",
+                             max_length=8, border_radius=24, col=8, dense=True),
+                ft.FilledButton("Location", icon=ft.icons.FOLDER_OPEN,
+                                on_click=lambda _: get_directory_dialog.get_directory_path(),)
             ]
         )
 
@@ -89,6 +122,7 @@ class Shortcut(ft.UserControl):
                     spacing=22,
                     controls=[
                         self.info_display,
+                        self.edit_shortcut_mode,
                         self.actions
                     ]
                 )
@@ -134,6 +168,12 @@ class Shortcut(ft.UserControl):
             self.action_list.controls.append(action_button)
 
 
+# Open directory dialog
+def get_directory_result(e: ft.FilePickerResultEvent):
+    path = e.path if e.path else "Cancelled!"
+    print(path)
+
+
 def main(page: ft.Page):
 
     # window settings
@@ -153,6 +193,12 @@ def main(page: ft.Page):
     page.window_always_on_top = True
 
     page.update()
+
+    global get_directory_dialog
+    get_directory_dialog = ft.FilePicker(
+        on_result=get_directory_result)
+
+    page.overlay.extend([get_directory_dialog])
 
     # create application instance
     shortcut_view = ShortcutsView()
