@@ -2,8 +2,8 @@ import flet as ft
 import tkinter as tk
 from tkinter import filedialog
 
-main_page = ft.page
-
+dialog_result = ""
+current_shortcuts = []
 
 class ShortcutsView(ft.UserControl):
 
@@ -56,11 +56,18 @@ class ShortcutsView(ft.UserControl):
             path = content.get("path", "no path")
             shortcut = Shortcut(index, title, path)
             self.shortcuts_list.controls.append(shortcut)
-        # add shortcut to array
+
+            # add shortcut to array
+            global current_shortcuts
+            current_shortcuts.append(shortcut)
 
     def add_shortcut(self, id=0, title="", path=""):
-        print('add')
-        pass
+        global current_shortcuts
+        id = len(current_shortcuts) + 1
+        new_shortcut = Shortcut(id, title, path)
+        self.shortcuts_list.controls.append(new_shortcut)
+        self.update()
+        new_shortcut.edit()
 
 
 class Shortcut(ft.UserControl):
@@ -78,29 +85,27 @@ class Shortcut(ft.UserControl):
         self.info_txt_id = ft.Text(self.id, style=ft.TextThemeStyle.LABEL_LARGE,
                                    color="White",)
         self.info_txt_title = ft.Text(self.title, style=ft.TextThemeStyle.TITLE_MEDIUM,
-                                      color="White", expand=True)
-        self.info_display = ft.Row(
+                                      color="White", expand=True, )
+        
+        self.dropdown_toggle = ft.IconButton(icon=ft.icons.ARROW_DROP_DOWN_ROUNDED, )
+        self.info_display = ft.Container(content= ft.Row(
             alignment=ft.MainAxisAlignment.START,
             spacing=20,
             controls=[
                 self.info_txt_id,
-                self.info_txt_title
+                self.info_txt_title,
+                self.dropdown_toggle
             ]
-        )
+        ), on_click=self.actions_menu_toggle)
 
         # get_directory_dialog.current.on_result = self.get_location_path
         self.txt_field_id = ft.TextField(label="ID", value=self.id, border=ft.InputBorder.UNDERLINE, keyboard_type=ft.KeyboardType.NUMBER,
                                          max_length=1, col=3, text_align=ft.TextAlign.CENTER, dense=True)
         self.txt_field_title = ft.TextField(label="Title", value=self.title, border=ft.InputBorder.UNDERLINE,
-                                            max_length=12, border_radius=24, col=8, dense=True)
+                                            max_length=12, border_radius=24, col=8, dense=True,)
         self.txt_path = ft.Text(
             str(self.path) if self.path else "no location", col=9)
 
-        self.get_directory_dialog = ft.FilePicker(
-            on_result=self.get_location_path)
-
-        global main_page
-        main_page.overlay.extend([self.get_directory_dialog])
 
         self.edit_shortcut_mode = ft.ResponsiveRow(
             visible=self.edit_mode,
@@ -109,7 +114,7 @@ class Shortcut(ft.UserControl):
                 self.txt_field_id,
                 self.txt_field_title,
                 ft.IconButton(icon=ft.icons.FOLDER_OPEN,
-                              on_click=self.get_directory_dialog.get_directory_path, col=3),
+                              on_click=self.change_shortcut_path, col=3),
                 self.txt_path,
                 ft.TextButton("Cancel", col=5,
                               on_click=self.cancel),
@@ -131,17 +136,11 @@ class Shortcut(ft.UserControl):
             content=self.action_list
         )
 
-        self.alert_dialog = ft.AlertDialog(
-            title=ft.Text("Acabar o alearta de erro e o select folder demasiado lento"))
-        main_page.dialog = self.alert_dialog
-        self.alert_dialog.open = True
-
         return ft.Card(
             expand=True,
             content=ft.Container(
                 padding=ft.padding.symmetric(vertical=20, horizontal=20),
                 border_radius=12,
-                on_click=self.actions_menu_toggle,
                 content=ft.Column(
                     expand=True,
                     alignment=ft.MainAxisAlignment.CENTER,
@@ -159,6 +158,7 @@ class Shortcut(ft.UserControl):
         if not self.edit_mode:
             self.actions.visible = not self.actions_menu_active
             self.actions_menu_active = not self.actions_menu_active
+            self.dropdown_toggle.rotate = ft.Rotate(0) if not self.actions_menu_active else ft.Rotate(3.15)
             self.update()
 
     def edit(self):
@@ -177,7 +177,7 @@ class Shortcut(ft.UserControl):
         txt_field_title = self.txt_field_title.value
         txt_path = self.txt_path.value
 
-        if txt_field_id.isdigit() and txt_field_id and txt_field_title and txt_path:
+        if txt_field_id.isdigit() and txt_field_id and txt_field_title and not txt_path in ["", " ", "no location", "No location"] :
 
             self.id = txt_field_id
             self.title = txt_field_title
@@ -194,16 +194,19 @@ class Shortcut(ft.UserControl):
             self.info_display.visible = True
             self.actions.visible = True
 
-            self.update()
 
         else:
             if not txt_field_id.isdigit():
-                self.alert_dialog.title = ft.Text(
-                    "ID must be numeric between 1-6")
-                self.alert_dialog.open = True
-            elif not (txt_field_id and txt_field_title and txt_path):
-                self.alert_dialog.title = ft.Text("Fill empty camps")
-                self.alert_dialog.open = True
+                # self.lol_alert_dialog.title = ft.Text(
+                #     "ID must be numeric between 1-6")
+                pass
+            else:
+                # self.lol_alert_dialog.title = ft.Text("Fill empty camps")
+                pass
+
+            # self.lol_alert_dialog.open = True
+
+        self.update()
 
     def cancel(self, e):
         self.txt_path.value = self.path
@@ -218,14 +221,29 @@ class Shortcut(ft.UserControl):
 
         self.update()
 
-    def get_location_path(self, e):
-        if e.path:
-            path = e.path
-            self.txt_path.value = path
-            self.update()
+    def change_shortcut_path(self, e):
+        global dialog_result
+        old_directory_path = dialog_result
 
-    def delete(self, e):
-        pass
+        # open dialog
+        get_directory_dialog.get_directory_path("Pick a location")
+        
+        while dialog_result == old_directory_path:
+            pass
+
+        self.txt_path.value = dialog_result
+        self.update()
+
+    def delete(self):
+        global current_shortcuts
+
+        for shortcut in current_shortcuts:
+            if shortcut.id == self.id :
+                current_shortcuts.remove(shortcut)
+                
+                
+
+        self.update()
 
     def read_stored_action(self):
         actions = [
@@ -266,8 +284,17 @@ class Shortcut(ft.UserControl):
         match hotkey:
             case "e":
                 self.edit()
+            
+            case "d":
+                self.delete()
+
             case _:
                 print("not valid hotkey")
+
+# get directory dialog result
+def get_directory(e: ft.FilePickerResultEvent):
+    global dialog_result
+    dialog_result = e.path if e.path else "No location"
 
 
 def main(page: ft.Page):
@@ -291,13 +318,19 @@ def main(page: ft.Page):
     page.window_visible = True
     page.window_always_on_top = True
 
-    page.update()
+    # file dialog
+    global get_directory_dialog
+    get_directory_dialog = ft.FilePicker(on_result=get_directory)
+
+    page.dialog = get_directory_dialog
+    page.overlay.append(get_directory_dialog)
 
     # create application instance
     shortcut_view = ShortcutsView()
 
     # add application's root control to the page
     page.add(shortcut_view)
+    page.update()
 
 
 ft.app(target=main)
