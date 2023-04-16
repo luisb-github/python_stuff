@@ -14,6 +14,7 @@
 tkinter/
 Server_Client/
 PypQt5/
+Fleet/lol/
 
 
 # ignore doc/notes.txt, but not doc/server/arch.txt

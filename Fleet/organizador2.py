@@ -1,13 +1,13 @@
+from math import pi
 import flet as ft
-import tkinter as tk
-from tkinter import filedialog
+import json
+import keyboard
 
 dialog_result = ""
 current_shortcuts = []
 
-class ShortcutsView(ft.UserControl):
 
-    stored_shortcuts = []
+class ShortcutsView(ft.UserControl):
 
     def build(self):
         self.banner = ft.Row(
@@ -21,7 +21,7 @@ class ShortcutsView(ft.UserControl):
         )
 
         self.shortcuts_list = ft.ListView(spacing=14, auto_scroll=True)
-        self.load_shortcuts_to_list()
+        self.load_stored_shortcuts()
 
         return ft.Column(
             spacing=34,
@@ -32,14 +32,18 @@ class ShortcutsView(ft.UserControl):
         )
 
     def read_stored_shortcuts(self):
-        stored_shortcuts = [
-            {"title": "Documents", "path": "Documents"},
-            {"title": "Vamos Ver", "path": "C:\\Users\\luisb\\Music\\vamosver"},
-        ]
+        # decrypt file
+
+        # opening json file
+        json_file = open('organizador_data.json')
+
+        # get shortcuts from json file
+        json_data = json.load(json_file)
+        stored_shortcuts = json_data.get("shortcuts", "")
 
         return stored_shortcuts
 
-    def load_shortcuts_to_list(self):
+    def load_stored_shortcuts(self):
         # grab list of shortcuts
         stored_shortcuts = self.read_stored_shortcuts()
 
@@ -51,23 +55,31 @@ class ShortcutsView(ft.UserControl):
             return
 
         # append shortcuts to list
-        for index, content in enumerate(stored_shortcuts, 1):
-            title = content.get("title", "no title")
-            path = content.get("path", "no path")
-            shortcut = Shortcut(index, title, path)
+        for shortcut in stored_shortcuts:
+            title = shortcut.get("title", "no title")
+            path = shortcut.get("path", "no path")
+            id = shortcut.get("id", "no id")
+            shortcut = Shortcut(id, title, path, self.delete_shortcut)
+
             self.shortcuts_list.controls.append(shortcut)
 
-            # add shortcut to array
+            # add created shortcut to global array of current shortcuts
             global current_shortcuts
             current_shortcuts.append(shortcut)
 
     def add_shortcut(self, id=0, title="", path=""):
         global current_shortcuts
         id = len(current_shortcuts) + 1
-        new_shortcut = Shortcut(id, title, path)
+        new_shortcut = Shortcut(id, title, path, self.delete_shortcut)
+        current_shortcuts.append(new_shortcut)
         self.shortcuts_list.controls.append(new_shortcut)
         self.update()
         new_shortcut.edit()
+
+    def delete_shortcut(self, shortcut):
+        self.shortcuts_list.controls.remove(shortcut)
+
+        self.update()
 
 
 class Shortcut(ft.UserControl):
@@ -75,20 +87,21 @@ class Shortcut(ft.UserControl):
     actions_menu_active = False
     edit_mode = False
 
-    def __init__(self, id, title, path):
+    def __init__(self, id, title, path, shortcut_delete):
         super().__init__()
         self.id = id
         self.title = title
         self.path = path
+        self.shortcut_delete = shortcut_delete
 
     def build(self):
         self.info_txt_id = ft.Text(self.id, style=ft.TextThemeStyle.LABEL_LARGE,
                                    color="White",)
         self.info_txt_title = ft.Text(self.title, style=ft.TextThemeStyle.TITLE_MEDIUM,
                                       color="White", expand=True, )
-        
-        self.dropdown_toggle = ft.IconButton(icon=ft.icons.ARROW_DROP_DOWN_ROUNDED, )
-        self.info_display = ft.Container(content= ft.Row(
+
+        self.dropdown_toggle = ft.Icon(name=ft.icons.ARROW_DROP_DOWN_ROUNDED, )
+        self.info_display = ft.Container(content=ft.Row(
             alignment=ft.MainAxisAlignment.START,
             spacing=20,
             controls=[
@@ -105,7 +118,6 @@ class Shortcut(ft.UserControl):
                                             max_length=12, border_radius=24, col=8, dense=True,)
         self.txt_path = ft.Text(
             str(self.path) if self.path else "no location", col=9)
-
 
         self.edit_shortcut_mode = ft.ResponsiveRow(
             visible=self.edit_mode,
@@ -158,7 +170,9 @@ class Shortcut(ft.UserControl):
         if not self.edit_mode:
             self.actions.visible = not self.actions_menu_active
             self.actions_menu_active = not self.actions_menu_active
-            self.dropdown_toggle.rotate = ft.Rotate(0) if not self.actions_menu_active else ft.Rotate(3.15)
+            self.dropdown_toggle.rotate = ft.Rotate(
+                angle=0.0*pi, alignment=ft.alignment.center) if not self.actions_menu_active else ft.Rotate(
+                angle=1.0*pi, alignment=ft.alignment.center)
             self.update()
 
     def edit(self):
@@ -177,7 +191,7 @@ class Shortcut(ft.UserControl):
         txt_field_title = self.txt_field_title.value
         txt_path = self.txt_path.value
 
-        if txt_field_id.isdigit() and txt_field_id and txt_field_title and not txt_path in ["", " ", "no location", "No location"] :
+        if txt_field_id.isdigit() and txt_field_id and txt_field_title and not txt_path in ["", " ", "no location", "No location"]:
 
             self.id = txt_field_id
             self.title = txt_field_title
@@ -194,7 +208,6 @@ class Shortcut(ft.UserControl):
             self.info_display.visible = True
             self.actions.visible = True
 
-
         else:
             if not txt_field_id.isdigit():
                 # self.lol_alert_dialog.title = ft.Text(
@@ -209,6 +222,11 @@ class Shortcut(ft.UserControl):
         self.update()
 
     def cancel(self, e):
+        # when new shortcut path and title empty -> so when cancel it disappears
+        if not (self.path and self.title):
+            self.delete()
+            return
+
         self.txt_path.value = self.path
 
         # disable edit mode
@@ -227,7 +245,7 @@ class Shortcut(ft.UserControl):
 
         # open dialog
         get_directory_dialog.get_directory_path("Pick a location")
-        
+
         while dialog_result == old_directory_path:
             pass
 
@@ -237,13 +255,10 @@ class Shortcut(ft.UserControl):
     def delete(self):
         global current_shortcuts
 
-        for shortcut in current_shortcuts:
-            if shortcut.id == self.id :
-                current_shortcuts.remove(shortcut)
-                
-                
+        shortcut_list_index = current_shortcuts.index(self)
+        current_shortcuts.pop(shortcut_list_index)
 
-        self.update()
+        self.shortcut_delete(self)
 
     def read_stored_action(self):
         actions = [
@@ -284,7 +299,7 @@ class Shortcut(ft.UserControl):
         match hotkey:
             case "e":
                 self.edit()
-            
+
             case "d":
                 self.delete()
 
@@ -292,6 +307,8 @@ class Shortcut(ft.UserControl):
                 print("not valid hotkey")
 
 # get directory dialog result
+
+
 def get_directory(e: ft.FilePickerResultEvent):
     global dialog_result
     dialog_result = e.path if e.path else "No location"
@@ -301,6 +318,7 @@ def main(page: ft.Page):
 
     global main_page
     main_page = page
+    app_visibility = True
 
     # window settings
     window_position_x = 2100
@@ -315,9 +333,14 @@ def main(page: ft.Page):
     page.padding = 20
     page.window_resizable = False
     page.title = "Organizador"
-    page.window_visible = True
+    page.window_visible = app_visibility
     page.window_always_on_top = True
 
+    def toggle_app():
+        nonlocal app_visibility
+        page.window_visible = not app_visibility
+        app_visibility = not app_visibility
+        page.update()
     # file dialog
     global get_directory_dialog
     get_directory_dialog = ft.FilePicker(on_result=get_directory)
@@ -325,6 +348,9 @@ def main(page: ft.Page):
     page.dialog = get_directory_dialog
     page.overlay.append(get_directory_dialog)
 
+    # open app on shortcut
+    keyboard.add_hotkey('alt+shift+q', toggle_app,
+                        suppress=True)
     # create application instance
     shortcut_view = ShortcutsView()
 
