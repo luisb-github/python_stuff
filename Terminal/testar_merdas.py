@@ -1,6 +1,3 @@
-import tkinter as tk
+frasse = "lolitos"
 
-root = tk.Tk()
-root.withdraw()  # keep the window from showing
-
-print(root.clipboard_get())
+print(frasse[:-1])

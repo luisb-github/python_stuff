@@ -5,6 +5,8 @@ import keyboard
 
 dialog_result = ""
 current_shortcuts = []
+combination = "0"
+listen_keyboard_events = True
 
 
 class ShortcutsView(ft.UserControl):
@@ -166,7 +168,7 @@ class Shortcut(ft.UserControl):
             )
         )
 
-    def actions_menu_toggle(self, e):
+    def actions_menu_toggle(self, e=""):
         if not self.edit_mode:
             self.actions.visible = not self.actions_menu_active
             self.actions_menu_active = not self.actions_menu_active
@@ -175,7 +177,12 @@ class Shortcut(ft.UserControl):
                 angle=1.0*pi, alignment=ft.alignment.center)
             self.update()
 
+    def set_keyboard_event_listen(self, state):
+        global listen_keyboard_events
+        listen_keyboard_events = state
+
     def edit(self):
+        global listen_keyboard_events
         # make info and actions disappear
         self.info_display.visible = False
         self.actions.visible = False
@@ -183,6 +190,8 @@ class Shortcut(ft.UserControl):
         # enable edit mode
         self.edit_mode = True
         self.edit_shortcut_mode.visible = True
+
+        self.set_keyboard_event_listen(False)
 
         self.update()
 
@@ -219,6 +228,8 @@ class Shortcut(ft.UserControl):
 
             # self.lol_alert_dialog.open = True
 
+        self.set_keyboard_event_listen(True)
+
         self.update()
 
     def cancel(self, e):
@@ -236,6 +247,12 @@ class Shortcut(ft.UserControl):
         # make info and actions disappear
         self.info_display.visible = True
         self.actions.visible = True
+
+        # remove action from combination
+        global combination
+        combination = combination[:-1]
+
+        self.set_keyboard_event_listen(True)
 
         self.update()
 
@@ -285,18 +302,21 @@ class Shortcut(ft.UserControl):
             # make actions that affect the shortcuts visually diferent from real actions
             if action.get('type'):
                 action_button = ft.OutlinedButton(
-                    action_title, col={"xs": 6, "sm": 6, "md": 2}, on_click=self.read_action,)
+                    action_title, col={"xs": 6, "sm": 6, "md": 2}, on_click=self.action_click,)
             else:
                 action_button = ft.FilledTonalButton(
-                    action_title, col={"xs": 12, "sm": 6, "md": 2}, on_click=self.read_action,)
+                    action_title, col={"xs": 12, "sm": 6, "md": 2}, on_click=self.action_click,)
 
             self.action_list.controls.append(action_button)
 
-    def read_action(self, e):
+    def action_click(self, e):
         # gets the hotkey (mouse clicked)
         hotkey = e.control.text[-2:-1]
 
-        match hotkey:
+        self.read_action(hotkey)
+
+    def read_action(self, action):
+        match action:
             case "e":
                 self.edit()
 
@@ -305,6 +325,7 @@ class Shortcut(ft.UserControl):
 
             case _:
                 print("not valid hotkey")
+
 
 # get directory dialog result
 
@@ -319,6 +340,7 @@ def main(page: ft.Page):
     global main_page
     main_page = page
     app_visibility = True
+    active_current_shortcut_index = 0
 
     # window settings
     window_position_x = 2100
@@ -340,7 +362,9 @@ def main(page: ft.Page):
         nonlocal app_visibility
         page.window_visible = not app_visibility
         app_visibility = not app_visibility
+        page.window_focused = not app_visibility
         page.update()
+
     # file dialog
     global get_directory_dialog
     get_directory_dialog = ft.FilePicker(on_result=get_directory)
@@ -351,6 +375,89 @@ def main(page: ft.Page):
     # open app on shortcut
     keyboard.add_hotkey('alt+shift+q', toggle_app,
                         suppress=True)
+
+    # window event
+    def window_event(e):
+        nonlocal app_visibility
+
+        if e.data in ['focus', 'restore']:
+            pass
+        if e.data in ['blur', 'minimized']:
+            app_visibility = False
+            page.window_visible = app_visibility
+
+        page.update()
+
+    # page.on_window_event = window_event
+
+    # keyboard event
+
+    def process_combination(hotkey):
+        global combination
+        nonlocal active_current_shortcut_index
+
+        # listen to add events
+        # make combination global and add on click
+        # add a hoverbutton that with combination
+        # backspace deletes one round
+        # make and input for combinations for even more advanced users
+
+        # logic problem to progress to second round *done*
+        # keyboard listening while typing on edit is a problem *done*
+        # disabled hide on losing focus
+        # logic if i 1d and then e and then delete he will delete 2 because 2 now is in index 1
+        print(hotkey)
+        if hotkey in ['backspace', 'escape']:
+            if hotkey == 'backspace':
+                combination = combination[:-1]
+            else:
+                combination = "0"
+                print("reset")
+
+        # if hotkey is the same type as last combination digit swap with last digit
+        elif (combination[-1].isdigit() and hotkey[-1].isdigit()) or (combination[-1].isalpha() and hotkey.isalpha()):
+            combination = combination[:-1] + hotkey
+        else:
+            combination += hotkey
+
+        print(combination)
+        round = len(combination)
+        match round:
+            case 1:
+                for shortcut in current_shortcuts:
+                    if str(shortcut.id) == str(combination):
+                        index = current_shortcuts.index(shortcut)
+                        current_shortcuts[index].actions_menu_toggle()
+
+                        active_current_shortcut_index = index
+                        break
+            case 2:
+                action = combination[-1]
+                index = active_current_shortcut_index
+                current_shortcuts[index].read_action(
+                    action)
+
+    def keyboard_event(e):
+
+        if not listen_keyboard_events:
+            return
+
+        key = str(e.key).lower()
+        print(key)
+
+        # enable numpad numbers
+        if "numpad" in key:
+            numpad_key = key.split()[-1]
+            key = numpad_key if numpad_key.isdigit() else ""
+
+        # filter: not empty, 1 character, digit or letter, special characters not filteres by alpha
+        if key and len(key) == 1 and (key.isdigit() or key.isalpha()) and not key in ["º", "ª"]:
+            process_combination(key)
+
+        if key in ['backspace', 'escape']:
+            process_combination(key)
+
+    page.on_keyboard_event = keyboard_event
     # create application instance
     shortcut_view = ShortcutsView()
 
