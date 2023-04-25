@@ -362,7 +362,7 @@ def main(page: ft.Page):
         nonlocal app_visibility
         page.window_visible = not app_visibility
         app_visibility = not app_visibility
-        page.window_focused = not app_visibility
+        # page.window_focused = not app_visibility
         page.update()
 
     # file dialog
@@ -373,22 +373,27 @@ def main(page: ft.Page):
     page.overlay.append(get_directory_dialog)
 
     # open app on shortcut
-    keyboard.add_hotkey('alt+shift+q', toggle_app,
-                        suppress=True)
+    keyboard.add_hotkey('alt+shift+q', toggle_app, timeout=2,
+                        suppress=True, trigger_on_release=True)
 
     # window event
     def window_event(e):
         nonlocal app_visibility
+        global listen_keyboard_events
+
+        if not listen_keyboard_events:
+            return
 
         if e.data in ['focus', 'restore']:
-            pass
+            page.window_to_front()
+            app_visibility = True
         if e.data in ['blur', 'minimized']:
             app_visibility = False
             page.window_visible = app_visibility
 
         page.update()
 
-    # page.on_window_event = window_event
+    page.on_window_event = window_event
 
     # keyboard event
 
@@ -402,10 +407,8 @@ def main(page: ft.Page):
         # backspace deletes one round
         # make and input for combinations for even more advanced users
 
-        # logic problem to progress to second round *done*
-        # keyboard listening while typing on edit is a problem *done*
-        # disabled hide on losing focus
         # logic if i 1d and then e and then delete he will delete 2 because 2 now is in index 1
+        # solution for problem above : change list to dict
         print(hotkey)
         if hotkey in ['backspace', 'escape']:
             if hotkey == 'backspace':
