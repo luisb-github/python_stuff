@@ -1,6 +1,10 @@
 {
     "shortcuts": [
             {"id":1,"title": "Documents", "path": "Documents"},
-            {"id":2,"title": "Vamos Ver", "path": "C:\\Users\\luisb\\Music\\vamosver"}
+            {"id":2,"title": "Documents", "path": "Documents"},
+            {"id":3,"title": "Documents", "path": "Documents"},
+            {"id":4,"title": "Documents", "path": "Documents"},
+            {"id":5,"title": "Documents", "path": "Documents"},
+            {"id":6,"title": "Vamos Ver", "path": "C:\\Users\\luisb\\Music\\vamosver"}
     ]
 }

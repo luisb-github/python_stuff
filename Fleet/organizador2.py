@@ -4,12 +4,15 @@ import json
 import keyboard
 
 dialog_result = ""
-current_shortcuts = []
+# try to find away to make value Shortcut instances
+current_shortcuts = {}
 combination = "0"
 listen_keyboard_events = True
 
 
 class ShortcutsView(ft.UserControl):
+
+    MAX_SHORTCUTS = 6
 
     def build(self):
         self.banner = ft.Row(
@@ -22,7 +25,8 @@ class ShortcutsView(ft.UserControl):
             ]
         )
 
-        self.shortcuts_list = ft.ListView(spacing=14, auto_scroll=True)
+        self.shortcuts_list = ft.Column(
+            spacing=14, auto_scroll=True)
         self.load_stored_shortcuts()
 
         return ft.Column(
@@ -30,7 +34,8 @@ class ShortcutsView(ft.UserControl):
             controls=[
                 self.banner,
                 self.shortcuts_list,
-            ]
+            ],
+            scroll=ft.ScrollMode.ALWAYS
         )
 
     def read_stored_shortcuts(self):
@@ -46,6 +51,14 @@ class ShortcutsView(ft.UserControl):
         return stored_shortcuts
 
     def load_stored_shortcuts(self):
+        # create empty dic in current_shortcuts
+        string_with_keys = ""
+        for i in range(1, self.MAX_SHORTCUTS+1):
+            string_with_keys += str(i)
+
+        global current_shortcuts
+        current_shortcuts = dict.fromkeys(string_with_keys)
+        see_current_shortcuts()
         # grab list of shortcuts
         stored_shortcuts = self.read_stored_shortcuts()
 
@@ -61,22 +74,54 @@ class ShortcutsView(ft.UserControl):
             title = shortcut.get("title", "no title")
             path = shortcut.get("path", "no path")
             id = shortcut.get("id", "no id")
-            shortcut = Shortcut(id, title, path, self.delete_shortcut)
-
-            self.shortcuts_list.controls.append(shortcut)
+            shortcut = Shortcut(
+                id, title, path, self.delete_shortcut, self.actions_menu_toggle)
 
             # add created shortcut to global array of current shortcuts
-            global current_shortcuts
-            current_shortcuts.append(shortcut)
+            current_shortcuts[str(id)] = shortcut
 
-    def add_shortcut(self, id=0, title="", path=""):
+        self.sort_shortcuts_list_control()
+
+    def add_shortcut(self, e, id=0, title="", path=""):
         global current_shortcuts
-        id = len(current_shortcuts) + 1
-        new_shortcut = Shortcut(id, title, path, self.delete_shortcut)
-        current_shortcuts.append(new_shortcut)
-        self.shortcuts_list.controls.append(new_shortcut)
+
+        if id == 0:
+            for index, content in current_shortcuts.items():
+                if not content:
+                    id = index
+                    new_shortcut = Shortcut(
+                        id, title, path, self.delete_shortcut, self.actions_menu_toggle)
+                    current_shortcuts[str(id)] = new_shortcut
+                    self.shortcuts_list.controls.append(new_shortcut)
+                    self.sort_shortcuts_list_control()
+
+                    self.update()
+                    new_shortcut.edit()
+                    break
+
+        # display an alert saying maximum shortcuts reached
+
+    def sort_shortcuts_list_control(self):
+        self.shortcuts_list.controls.clear()
+        for content in current_shortcuts.values():
+            if content:
+                self.shortcuts_list.controls.append(content)
+
+        see_current_shortcuts()
+
+    def actions_menu_toggle(self, shortcut):
+
+        shortcut.actions.visible = not shortcut.actions_menu_active
+        shortcut.actions_menu_active = not shortcut.actions_menu_active
+        shortcut.dropdown_toggle.rotate = ft.Rotate(
+            angle=0.0*pi, alignment=ft.alignment.center) if not shortcut.actions_menu_active else ft.Rotate(
+            angle=1.0*pi, alignment=ft.alignment.center)
         self.update()
-        new_shortcut.edit()
+        if int(shortcut.id) <= 3:
+            self.shortcuts_list.alignment = ft.MainAxisAlignment.START
+        else:
+            self.shortcuts_list.alignment = ft.MainAxisAlignment.END
+        self.update()
 
     def delete_shortcut(self, shortcut):
         self.shortcuts_list.controls.remove(shortcut)
@@ -86,19 +131,20 @@ class ShortcutsView(ft.UserControl):
 
 class Shortcut(ft.UserControl):
 
-    actions_menu_active = False
-    edit_mode = False
-
-    def __init__(self, id, title, path, shortcut_delete):
+    def __init__(self, id, title, path, shortcut_delete, action_menu_toggle):
         super().__init__()
         self.id = id
         self.title = title
         self.path = path
         self.shortcut_delete = shortcut_delete
+        self.actions_menu_toggle = action_menu_toggle
+
+        self.actions_menu_active = False
+        self.edit_mode = False
 
     def build(self):
         self.info_txt_id = ft.Text(self.id, style=ft.TextThemeStyle.LABEL_LARGE,
-                                   color="White",)
+                                   color="White", data=self)
         self.info_txt_title = ft.Text(self.title, style=ft.TextThemeStyle.TITLE_MEDIUM,
                                       color="White", expand=True, )
 
@@ -111,7 +157,7 @@ class Shortcut(ft.UserControl):
                 self.info_txt_title,
                 self.dropdown_toggle
             ]
-        ), on_click=self.actions_menu_toggle)
+        ), on_click=self.shortcut_click)
 
         # get_directory_dialog.current.on_result = self.get_location_path
         self.txt_field_id = ft.TextField(label="ID", value=self.id, border=ft.InputBorder.UNDERLINE, keyboard_type=ft.KeyboardType.NUMBER,
@@ -163,18 +209,14 @@ class Shortcut(ft.UserControl):
                         self.info_display,
                         self.edit_shortcut_mode,
                         self.actions
-                    ]
-                )
-            )
+                    ],
+                ),
+            ),
         )
 
-    def actions_menu_toggle(self, e=""):
+    def shortcut_click(self, e=""):
         if not self.edit_mode:
-            self.actions.visible = not self.actions_menu_active
-            self.actions_menu_active = not self.actions_menu_active
-            self.dropdown_toggle.rotate = ft.Rotate(
-                angle=0.0*pi, alignment=ft.alignment.center) if not self.actions_menu_active else ft.Rotate(
-                angle=1.0*pi, alignment=ft.alignment.center)
+            self.actions_menu_toggle(self)
             self.update()
 
     def set_keyboard_event_listen(self, state):
@@ -272,10 +314,12 @@ class Shortcut(ft.UserControl):
     def delete(self):
         global current_shortcuts
 
-        shortcut_list_index = current_shortcuts.index(self)
-        current_shortcuts.pop(shortcut_list_index)
+        id = self.id
+        current_shortcuts[str(id)] = None
 
+        self.update()
         self.shortcut_delete(self)
+        see_current_shortcuts()
 
     def read_stored_action(self):
         actions = [
@@ -334,8 +378,18 @@ def get_directory(e: ft.FilePickerResultEvent):
     global dialog_result
     dialog_result = e.path if e.path else "No location"
 
+# test function
+
+
+def see_current_shortcuts():
+    for index, content in current_shortcuts.items():
+        print(f'index: {index}, content: {content}')
+    print('\n')
+
 
 def main(page: ft.Page):
+
+    print("\n\n______ restart ______\n\n")
 
     global main_page
     main_page = page
@@ -352,11 +406,18 @@ def main(page: ft.Page):
     # page.window_top = window_position_y
     page.window_width = window_width
     page.window_height = window_height
-    page.padding = 20
     page.window_resizable = False
     page.title = "Organizador"
+    page.vertical_alignment = ft.MainAxisAlignment.CENTER
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    # page.window_bgcolor = ft.colors.TRANSPARENT
+    # page.bgcolor = ft.colors.TRANSPARENT
     page.window_visible = app_visibility
     page.window_always_on_top = True
+    page.padding = 0
+    page.window_frameless = True
+    page.window_title_bar_hidden = True
+    page.window_title_bar_buttons_hidden = True
 
     def toggle_app():
         nonlocal app_visibility
@@ -407,10 +468,9 @@ def main(page: ft.Page):
         # backspace deletes one round
         # make and input for combinations for even more advanced users
 
-        # logic if i 1d and then e and then delete he will delete 2 because 2 now is in index 1
-        # solution for problem above : change list to dict
+        # logic if i 1d and then e and then delete he will delete 2 because 2 now is in index 1 * done *
         print(hotkey)
-        if hotkey in ['backspace', 'escape']:
+        if hotkey in ['backspace', 'escape'] and combination:
             if hotkey == 'backspace':
                 combination = combination[:-1]
             else:
@@ -427,18 +487,21 @@ def main(page: ft.Page):
         round = len(combination)
         match round:
             case 1:
-                for shortcut in current_shortcuts:
-                    if str(shortcut.id) == str(combination):
-                        index = current_shortcuts.index(shortcut)
-                        current_shortcuts[index].actions_menu_toggle()
+                id = combination[round-1]
+                shortcut = current_shortcuts[id]
+                shortcut.actions_menu_toggle()
+                # for shortcut in current_shortcuts:
+                #     if str(shortcut.id) == str(combination):
+                #         index = current_shortcuts.index(shortcut)
+                #         current_shortcuts[index].actions_menu_toggle()
 
-                        active_current_shortcut_index = index
-                        break
+                #         active_current_shortcut_index = index
+                #         break
             case 2:
-                action = combination[-1]
-                index = active_current_shortcut_index
-                current_shortcuts[index].read_action(
-                    action)
+                action = combination[round-1]
+                id = combination[round-2]
+                shortcut = current_shortcuts[id]
+                shortcut.read_action(action)
 
     def keyboard_event(e):
 
@@ -463,10 +526,32 @@ def main(page: ft.Page):
     page.on_keyboard_event = keyboard_event
     # create application instance
     shortcut_view = ShortcutsView()
+    window_drag_area = ft.WindowDragArea(ft.Container(
+        padding=0,
+        content=ft.Icon(name=ft.icons.DRAG_HANDLE_ROUNDED,
+                        tooltip="Press to drag window", size=32, opacity=0.5)
+    ), maximizable=False)
+
+    main_container = ft.Container(
+        expand=True,
+        padding=ft.padding.only(20, 0, 20, 20),
+        bgcolor=ft.colors.BLACK,
+        border_radius=20,
+        content=ft.Column(
+            alignment=ft.MainAxisAlignment.START,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            expand=True,
+            controls=[
+                window_drag_area,
+                shortcut_view
+            ]
+        )
+    )
 
     # add application's root control to the page
-    page.add(shortcut_view)
+    page.add(main_container)
     page.update()
 
 
-ft.app(target=main)
+if __name__ == "__main__":
+    ft.app(target=main)
